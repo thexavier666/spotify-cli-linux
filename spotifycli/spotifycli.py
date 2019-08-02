@@ -5,7 +5,7 @@
 import argparse
 import os
 import sys
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_output
 
 import dbus
 import lyricwikia
@@ -51,6 +51,10 @@ def main():
         perform_spotify_action("Next")
     elif args.prev:
         perform_spotify_action("Previous")
+    elif args.volumeup:
+        control_volume("+5%")
+    elif args.volumedown:
+        control_volume("-5%")
 
 
 def start_shell():
@@ -98,7 +102,9 @@ def get_arguments():
         ("--playpause", "plays or pauses the song (toggles a state)"),
         ("--lyrics", "shows the lyrics for the song"),
         ("--next", "plays the next song"),
-        ("--prev", "plays the previous song")
+        ("--prev", "plays the previous song"),
+        ("--volumeup", "increases the sound volume"),
+        ("--volumedown", "decreases the sound volume")
     ]
 
 
@@ -198,6 +204,27 @@ def perform_spotify_action(spotify_command):
           client +
           '/org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player."%s"' %
           spotify_command, shell=True, stdout=PIPE)
+
+def get_sink_number():
+    out = check_output(['pacmd', 'list-sink-inputs'])
+    sink_number = None
+    for sink in out.split(b'index: '):
+        if b'spotify' in sink:
+            sink_number = sink.split(b'\n')[0]
+            break
+
+    return str(sink_number,'utf-8')
+
+def control_volume(volume_percent):
+    num = get_sink_number()
+    if not num:
+        print('No running Spotify instance found')
+        return
+
+    Popen(
+        'pactl set-sink-input-volume {0} {1}'.format(num, volume_percent),
+        shell=True,
+        stdout=PIPE)
 
 
 if __name__ == "__main__":
